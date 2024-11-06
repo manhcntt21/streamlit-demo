@@ -1,0 +1,3 @@
+opencv-python
+retina-face
+tf-keras

@@ -7,6 +7,8 @@ import wave
 import threading
 import os
 from datetime import datetime
+from retinaface import RetinaFace
+
 
 # Set page config first
 st.set_page_config(page_title="Chatbot TLU", page_icon="🦈", layout="wide")
@@ -156,10 +158,24 @@ if st.session_state.camera_running:
                 st.error("Failed to capture image from camera")
                 st.session_state.camera_running = False
                 break
+            faces = RetinaFace.detect_faces(frame)
+                # Iterate over the detected faces and draw bounding boxes
+
+            if faces:
+                print("Face detected")
+                for face in faces.values():
+                    x1, y1, x2, y2 = face['facial_area']
+                    # Draw a rectangle around the face
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            else:
+                print("No face detected")
+            # cv2.imwrite('output_image.jpg', frame)    
 
             # Convert from BGR to RGB
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             FRAME_WINDOW.image(frame)
+
+
 
     except Exception as e:
         st.error(f"Error accessing camera: {str(e)}")
