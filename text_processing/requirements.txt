@@ -3,3 +3,4 @@ llama_index
 transformers
 llama-index-embeddings-huggingface
 llama-index-llms-huggingface
+bitsandbytes
