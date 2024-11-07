@@ -1,14 +1,38 @@
 import streamlit as st
 import cv2
 import numpy as np
-import time
-import pyaudio
-from datetime import datetime
-import wave
+import os
 import threading
 import time
 import sounddevice as sd
+from retinaface import RetinaFace
+import pyaudio
+import wave
+from openai import OpenAI
 import io
+import numpy as np
+
+from speech.stt_stream import transcribe_audio
+
+
+# Your OpenAI API key
+api_key = ''
+
+# Microphone settings
+FORMAT = pyaudio.paInt16  # Audio format
+CHANNELS = 1  # Mono audio
+RATE = 16000  # Sample rate (Hz)
+CHUNK = 16000  # Size of each audio chunk
+DEVICE_INDEX = None  # You can set this if you have a specific microphone device
+
+# Create a PyAudio object
+p = pyaudio.PyAudio()
+
+client = OpenAI(api_key=api_key)
+
+# Function to read audio file in chunks
+wav_file_path = '/home/tony/Downloads/qh (mp3cut.net).wav'
+
 
 # set page config
 st.set_page_config(page_title="Chatbot TLU", page_icon="🦈", layout="wide")
@@ -23,10 +47,10 @@ if "frame_window" not in st.session_state:
     st.session_state.frame_window = st.empty()
 
 # Cấu hình audio
-CHUNK = 1024
-FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RATE = 44100
+# CHUNK = 1024
+# FORMAT = pyaudio.paInt16
+# CHANNELS = 1
+# RATE = 44100
 
 
 class AudioVideoRecorder:
@@ -35,6 +59,7 @@ class AudioVideoRecorder:
         self.audio = pyaudio.PyAudio()
         self.frames = []
         self.is_recording = False
+        self.check_face_detection = True
 
     def start_recording(self):
         # Khởi tạo video capture
@@ -55,12 +80,12 @@ class AudioVideoRecorder:
         self.audio_thread = threading.Thread(target=self.record_audio)
         self.audio_thread.start()
 
-
     def record_audio(self):
         while self.is_recording:
             try:
                 data = self.audio_stream.read(CHUNK)
-                self.frames.append(data)
+                yield data
+                # self.frames.append(data)
             except Exception as e:
                 st.error(f"Lỗi ghi âm: {str(e)}")
                 break
@@ -68,7 +93,44 @@ class AudioVideoRecorder:
     def get_video_frame(self):
         if self.video_capture is not None:
             ret, frame = self.video_capture.read()
+
             if ret:
+                if self.check_face_detection:
+                    # faces = RetinaFace.detect_faces(frame)
+                    faces = True
+                    if faces:
+                        print("Face detected")
+                        # for face in faces.values():
+                        #     x1, y1, x2, y2 = face['facial_area']
+                        #     # Draw a rectangle around the face
+                        #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        say_hello()
+                        self.check_face_detection = False
+
+                        voice_str, count = '', 0
+                        # ====Function to stream audio and transcribe it========
+                        for audio_chunk in self.record_audio():
+                            text = transcribe_audio(audio_chunk)
+                            if text:
+                                print("You said:", text)
+                            else:
+                                print("Sorry, could not understand the audio.")
+
+                            if text != "Hẹn gặp lại các bạn trong những video tiếp theo nhé!":
+                                voice_str += text + ' '
+                                count = 0
+                            else:
+                                count += 1
+
+                            if count >= 5:
+                                print("Text processing")
+                                print("Voice speech")
+                                count = 0
+                                voice_str = ''
+
+                    else:
+                        print("No face detected")
+
                 return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         return None
 
@@ -84,24 +146,25 @@ class AudioVideoRecorder:
             self.audio_stream.stop_stream()
             self.audio_stream.close()
         # create a folder if not exist
-        if not os.path.exists("recorded_audio"):
-            os.makedirs("recorded_audio")
+        if not os.path.exists("../demo_final/recorded_audio"):
+            os.makedirs("../demo_final/recorded_audio")
 
-        # # Lưu file audio
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"rrecorded_audio/ecording_{timestamp}.wav"
-
-        wf = wave.open(filename, "wb")
-        wf.setnchannels(CHANNELS)
-        wf.setsampwidth(self.audio.get_sample_size(FORMAT))
-        wf.setframerate(RATE)
-        wf.writeframes(b"".join(self.frames))
-        wf.close()
+        # # # Lưu file audio
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # filename = f"rrecorded_audio/ecording_{timestamp}.wav"
+        #
+        # wf = wave.open(filename, "wb")
+        # wf.setnchannels(CHANNELS)
+        # wf.setsampwidth(self.audio.get_sample_size(FORMAT))
+        # wf.setframerate(RATE)
+        # wf.writeframes(b"".join(self.frames))
+        # wf.close()
 
         return filename
 
 
 def say_hello():
+    print("Hello World!")
     return "hello"
 
 
@@ -160,7 +223,6 @@ def play_audio(audio_data, framerate):
         st.error(f"Error playing audio")
 
 
-
 if __name__ == "__main__":
     # sidebar
     with st.sidebar:
@@ -183,9 +245,6 @@ if __name__ == "__main__":
             st.session_state.recorder = AudioVideoRecorder()
             st.session_state.recorder.start_recording()
 
-            # đang stream videovv
-            # check người and say hello
-            say_hello()
         else:
             st.session_state.recording = False
             filename = st.session_state.recorder.stop_recording()
@@ -206,6 +265,6 @@ if __name__ == "__main__":
         frame = st.session_state.recorder.get_video_frame()
         if frame is not None:
             st.session_state.frame_window.image(frame)
-            time.sleep(0.033)  # Giới hạn ~30 FPS
+            time.sleep(1 / 60)  # Giới hạn ~30 FPS
             # st.rerun()
     st.session_state.frame_window.write("Camera đã tắt")

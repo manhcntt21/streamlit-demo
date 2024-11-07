@@ -1,3 +1,14 @@
+# CV
 streamlit==1.39.0
 opencv-python==4.10.0.84
 black
+opencv-python
+retina-face
+tf-keras
+
+# Speech
+openai
+pyaudio
+
+# Text
+onnxscript
