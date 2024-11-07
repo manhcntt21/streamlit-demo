@@ -1,0 +1,5 @@
+flask==2.2.5
+llama_index
+transformers
+llama-index-embeddings-huggingface
+llama-index-llms-huggingface
